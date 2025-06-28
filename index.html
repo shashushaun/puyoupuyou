@@ -1,1 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ぷよぷよゲーム</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+    #game-container {
+      position: relative;
+      width: 300px;
+      height: 450px; /* 9マス分（50px * 9） */
+      border: 4px solid #222;
+      background-color: #fff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+    .puyo {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background-size: cover;
+      border-radius: 50%;
+      transition: all 0.1s ease;
+    }
+    .puyo-red {
+      background-image: url('https://pbs.twimg.com/profile_images/1890585622500503552/rOXm_mUw_400x400.jpg');
+    }
+    .puyo-blue {
+      background-image: url('https://pbs.twimg.com/profile_images/1890585622500503552/rOXm_mUw_400x400.jpg');
+      filter: hue-rotate(120deg);
+    }
+    .puyo-green {
+      background-image: url('https://pbs.twimg.com/profile_images/1890585622500503552/rOXm_mUw_400x400.jpg');
+      filter: hue-rotate(240deg);
+    }
+    .puyo-yellow {
+      background-image: url('https://pbs.twimg.com/profile_images/1890585622500503552/rOXm_mUw_400x400.jpg');
+      filter: hue-rotate(60deg);
+    }
+    #controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #swap, #rotate {
+      background-color: #2196F3;
+    }
+    #swap:hover, #rotate:hover {
+      background-color: #1e87db;
+    }
+    #restart {
+      background-color: #ff9800;
+    }
+    #restart:hover {
+      background-color: #e68a00;
+    }
+    #message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      color: #ffeb3b;
+      text-shadow: 2px 2px 4px #000;
+      display: none;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="message"></div>
+  </div>
+  <div id="controls">
+    <button id="start">スタート</button>
+    <button id="restart" class="hidden">リスタート</button>
+    <button id="swap">入替</button>
+    <button id="rotate">回転</button>
+  </div>
+  <script>
+    const container = document.getElementById('game-container');
+    const message = document.getElementById('message');
+    const startBtn = document.getElementById('start');
+    const restartBtn = document.getElementById('restart');
+    const swapBtn = document.getElementById('swap');
+    const rotateBtn = document.getElementById('rotate');
+    let gameInterval = null;
+    let isPlaying = false;
+    let score = 0;
+    let puyos = [];
+    const colors = ['red', 'blue', 'green', 'yellow'];
+    const gridWidth = 6;
+    const gridHeight = 9; // 下部ラインを3マス分上げる
+    const cellSize = 50;
+    let currentPuyos = [];
+    let fixedPuyos = [];
+    let grid = Array(gridHeight).fill().map(() => Array(gridWidth).fill(null));
+    let isHorizontal = false;
 
+    function createPuyoPair() {
+      currentPuyos = [];
+      const puyo1 = document.createElement('div');
+      const puyo2 = document.createElement('div');
+      puyo1.classList.add('puyo');
+      puyo2.classList.add('puyo');
+      const color1 = colors[Math.floor(Math.random() * colors.length)];
+      const color2 = colors[Math.floor(Math.random() * colors.length)];
+      puyo1.classList.add(`puyo-${color1}`);
+      puyo2.classList.add(`puyo-${color2}`);
+      const x = Math.floor(gridWidth / 2) * cellSize;
+      puyo1.style.left = `${x}px`;
+      puyo1.style.top = '0px';
+      puyo2.style.left = `${x}px`;
+      puyo2.style.top = `${cellSize}px`;
+      container.appendChild(puyo1);
+      container.appendChild(puyo2);
+      puyos.push(puyo1, puyo2);
+      currentPuyos = [puyo1, puyo2];
+      isHorizontal = false;
+    }
+
+    function movePuyoPair() {
+      if (!isPlaying || !currentPuyos.length) return;
+      const top1 = parseInt(currentPuyos[0].style.top || '0', 10);
+      const top2 = parseInt(currentPuyos[1].style.top || '0', 10);
+      const left1 = parseInt(currentPuyos[0].style.left || '0', 10);
+      const left2 = parseInt(currentPuyos[1].style.left || '0', 10);
+      const x1 = Math.round(left1 / cellSize);
+      const x2 = Math.round(left2 / cellSize);
+      const y1 = Math.round((top1 + cellSize) / cellSize);
+      const y2 = Math.round((top2 + cellSize) / cellSize);
+
+      if (isHorizontal) {
+        if (y1 >= gridHeight || (y1 < gridHeight && (grid[y1][x1] !== null || grid[y1][x2] !== null))) {
+          fixPuyoPair();
+        } else {
+          currentPuyos[0].style.top = `${top1 + cellSize}px`;
+          currentPuyos[1].style.top = `${top2 + cellSize}px`;
+        }
+      } else {
+        if (y2 >= gridHeight || (y2 < gridHeight && grid[y2][x1] !== null)) {
+          fixPuyoPair();
+        } else {
+          currentPuyos[0].style.top = `${top1 + cellSize}px`;
+          currentPuyos[1].style.top = `${top2 + cellSize}px`;
+        }
+      }
+    }
+
+    function fixPuyoPair() {
+      if (!isPlaying || !currentPuyos.length) return;
+      const left1 = parseInt(currentPuyos[0].style.left || '0', 10);
+      const left2 = parseInt(currentPuyos[1].style.left || '0', 10);
+      const top1 = parseInt(currentPuyos[0].style.top || '0', 10);
+      const top2 = parseInt(currentPuyos[1].style.top || '0', 10);
+      const x1 = Math.round(left1 / cellSize);
+      const x2 = Math.round(left2 / cellSize);
+      let y1 = Math.round(top1 / cellSize);
+      let y2 = Math.round(top2 / cellSize);
+
+      if (y1 < 0 || y2 < 0) {
+        gameOver('ゲームオーバー！');
+        return;
+      }
+
+      if (isHorizontal) {
+        if (y1 >= 0 && y1 < gridHeight && x1 >= 0 && x1 < gridWidth && grid[y1][x1] === null) {
+          grid[y1][x1] = currentPuyos[0].classList[1];
+          fixedPuyos.push(currentPuyos[0]);
+        }
+        if (y1 >= 0 && y1 < gridHeight && x2 >= 0 && x2 < gridWidth && grid[y1][x2] === null) {
+          grid[y1][x2] = currentPuyos[1].classList[1];
+          fixedPuyos.push(currentPuyos[1]);
+        }
+      } else {
+        if (y1 >= 0 && y1 < gridHeight && x1 >= 0 && x1 < gridWidth && grid[y1][x1] === null) {
+          grid[y1][x1] = currentPuyos[0].classList[1];
+          fixedPuyos.push(currentPuyos[0]);
+        }
+        if (y2 >= 0 && y2 < gridHeight && x1 >= 0 && x1 < gridWidth && grid[y2][x1] === null) {
+          grid[y2][x1] = currentPuyos[1].classList[1];
+          fixedPuyos.push(currentPuyos[1]);
+        }
+      }
+
+      checkForMatches();
+      if (isPlaying) createPuyoPair();
+    }
+
+    function rotatePuyos() {
+      if (!isPlaying || !currentPuyos.length) return;
+      const left1 = parseInt(currentPuyos[0].style.left || '0', 10);
+      const top1 = parseInt(currentPuyos[0].style.top || '0', 10);
+      const x1 = Math.round(left1 / cellSize);
+      const y1 = Math.round(top1 / cellSize);
+
+      if (isHorizontal) {
+        if (y1 + 1 < gridHeight && grid[y1 + 1][x1] === null) {
+          currentPuyos[1].style.left = `${left1}px`;
+          currentPuyos[1].style.top = `${top1 + cellSize}px`;
+          isHorizontal = false;
+        }
+      } else {
+        if (x1 + 1 < gridWidth && grid[y1][x1 + 1] === null) {
+          currentPuyos[1].style.left = `${left1 + cellSize}px`;
+          currentPuyos[1].style.top = `${top1}px`;
+          isHorizontal = true;
+        }
+      }
+    }
+
+    function swapPuyos() {
+      if (!isPlaying || !currentPuyos.length) return;
+      const tempColor = currentPuyos[0].classList[1];
+      currentPuyos[0].classList.replace(tempColor, currentPuyos[1].classList[1]);
+      currentPuyos[1].classList.replace(currentPuyos[1].classList[1], tempColor);
+    }
+
+    function checkForMatches() {
+      let matches = [];
+      const visited = Array(gridHeight).fill().map(() => Array(gridWidth).fill(false));
+
+      function dfs(x, y, color, match) {
+        if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight || visited[y][x] || grid[y][x] !== color) {
+          return;
+        }
+        visited[y][x] = true;
+        match.push({ x, y });
+        dfs(x + 1, y, color, match);
+        dfs(x - 1, y, color, match);
+        dfs(x, y + 1, color, match);
+        dfs(x, y - 1, color, match);
+      }
+
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          if (grid[y][x] && !visited[y][x]) {
+            let match = [];
+            dfs(x, y, grid[y][x], match);
+            if (match.length >= 4) {
+              matches.push(...match);
+            }
+          }
+        }
+      }
+
+      if (matches.length) {
+        matches.forEach(m => {
+          grid[m.y][m.x] = null;
+          const puyo = fixedPuyos.find(p => Math.round(parseInt(p.style.left || '0') / cellSize) === m.x && Math.round(parseInt(p.style.top || '0') / cellSize) === m.y);
+          if (puyo) container.removeChild(puyo);
+        });
+        fixedPuyos = fixedPuyos.filter(p => !matches.some(m => Math.round(parseInt(p.style.left || '0') / cellSize) === m.x && Math.round(parseInt(p.style.top || '0') / cellSize) === m.y));
+        score += matches.length * 10;
+        if (score >= 1000) gameOver('おめでとう！ゲームクリア！');
+        dropPuyos();
+      }
+    }
+
+    function dropPuyos() {
+      for (let x = 0; x < gridWidth; x++) {
+        let emptyY = gridHeight - 1;
+        for (let y = gridHeight - 1; y >= 0; y--) {
+          if (grid[y][x] !== null) {
+            if (y !== emptyY) {
+              grid[emptyY][x] = grid[y][x];
+              grid[y][x] = null;
+              const puyo = fixedPuyos.find(p => Math.round(parseInt(p.style.left || '0') / cellSize) === x && Math.round(parseInt(p.style.top || '0') / cellSize) === y);
+              if (puyo) puyo.style.top = `${emptyY * cellSize}px`;
+            }
+            emptyY--;
+          }
+        }
+      }
+    }
+
+    function gameOver(text) {
+      if (gameInterval) clearInterval(gameInterval);
+      isPlaying = false;
+      startBtn.classList.add('hidden');
+      restartBtn.classList.remove('hidden');
+      message.textContent = text;
+      message.style.display = 'block';
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (!isPlaying) {
+        isPlaying = true;
+        score = 0;
+        puyos = [];
+        fixedPuyos = [];
+        grid = Array(gridHeight).fill().map(() => Array(gridWidth).fill(null));
+        currentPuyos = [];
+        message.style.display = 'none';
+        startBtn.classList.add('hidden');
+        restartBtn.classList.remove('hidden');
+        if (gameInterval) clearInterval(gameInterval);
+        createPuyoPair();
+        gameInterval = setInterval(movePuyoPair, 1000);
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      location.reload();
+    });
+
+    swapBtn.addEventListener('click', () => {
+      if (isPlaying) swapPuyos();
+    });
+
+    rotateBtn.addEventListener('click', () => {
+      if (isPlaying) rotatePuyos();
+    });
+
+    container.addEventListener('touchstart', (e) => {
+      if (!isPlaying || !currentPuyos.length) return;
+      const touchX = e.touches[0].clientX;
+      const puyoX = parseInt(currentPuyos[0].style.left || '0', 10);
+      if (isHorizontal) {
+        const puyoX2 = parseInt(currentPuyos[1].style.left || '0', 10);
+        const y = Math.round(parseInt(currentPuyos[0].style.top || '0') / cellSize);
+        if (touchX < window.innerWidth / 2) {
+          if (puyoX > 0 && grid[y][Math.round((puyoX - cellSize) / cellSize)] === null) {
+            currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) - cellSize}px`);
+          }
+        } else {
+          if (puyoX2 < (gridWidth - 1) * cellSize && grid[y][Math.round((puyoX2 + cellSize) / cellSize)] === null) {
+            currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) + cellSize}px`);
+          }
+        }
+      } else {
+        const y2 = Math.round(parseInt(currentPuyos[1].style.top || '0') / cellSize);
+        if (touchX < window.innerWidth / 2) {
+          if (puyoX > 0 && grid[y2][Math.round((puyoX - cellSize) / cellSize)] === null) {
+            currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) - cellSize}px`);
+          }
+        } else {
+          if (puyoX < (gridWidth - 1) * cellSize && grid[y2][Math.round((puyoX + cellSize) / cellSize)] === null) {
+            currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) + cellSize}px`);
+          }
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!isPlaying || !currentPuyos.length) return;
+      const puyoX = parseInt(currentPuyos[0].style.left || '0', 10);
+      if (isHorizontal) {
+        const puyoX2 = parseInt(currentPuyos[1].style.left || '0', 10);
+        const y = Math.round(parseInt(currentPuyos[0].style.top || '0') / cellSize);
+        if (e.key === 'ArrowLeft' && puyoX > 0 && grid[y][Math.round((puyoX - cellSize) / cellSize)] === null) {
+          currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) - cellSize}px`);
+        } else if (e.key === 'ArrowRight' && puyoX2 < (gridWidth - 1) * cellSize && grid[y][Math.round((puyoX2 + cellSize) / cellSize)] === null) {
+          currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) + cellSize}px`);
+        } else if (e.key === 'ArrowUp') {
+          rotatePuyos();
+        } else if (e.key === ' ') {
+          swapPuyos();
+        }
+      } else {
+        const y2 = Math.round(parseInt(currentPuyos[1].style.top || '0') / cellSize);
+        if (e.key === 'ArrowLeft' && puyoX > 0 && grid[y2][Math.round((puyoX - cellSize) / cellSize)] === null) {
+          currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) - cellSize}px`);
+        } else if (e.key === 'ArrowRight' && puyoX < (gridWidth - 1) * cellSize && grid[y2][Math.round((puyoX + cellSize) / cellSize)] === null) {
+          currentPuyos.forEach(p => p.style.left = `${parseInt(p.style.left || '0', 10) + cellSize}px`);
+        } else if (e.key === 'ArrowUp') {
+          rotatePuyos();
+        } else if (e.key === ' ') {
+          swapPuyos();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
