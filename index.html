@@ -92,8 +92,8 @@
     }
     #score {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: -30px; /* ゲームコンテナの上（枠外） */
+      left: 0;
       font-size: 20px;
       color: #000;
       z-index: 5; /* スコアはぷよの上、メッセージの下 */
@@ -104,8 +104,8 @@
   </style>
 </head>
 <body>
+  <div id="score">スコア: 0</div>
   <div id="game-container">
-    <div id="score">スコア: 0</div>
     <div id="message"></div>
   </div>
   <div id="controls">
@@ -199,7 +199,7 @@
       // 画面上枠（y=0）に到達し、すでにぷよがある場合ゲームオーバー
       if (y1 <= 0 || y2 <= 0) {
         if (y1 === 0 && grid[0][x1] !== null || y2 === 0 && grid[0][x1] !== null || (isHorizontal && grid[0][x2] !== null)) {
-          gameOver('しょーん 　もな！');
+          gameOver('しょーん もな！');
           return;
         }
       }
@@ -240,12 +240,22 @@
           currentPuyos[1].style.left = `${left1}px`;
           currentPuyos[1].style.top = `${top1 + cellSize}px`;
           isHorizontal = false;
+          // 回転後に下にぷよや下部ラインがない場合、即座に落下
+          const newY2 = Math.round((parseInt(currentPuyos[1].style.top || '0') + cellSize) / cellSize);
+          if (newY2 < gridHeight && grid[newY2][x1] === null) {
+            movePuyoPair();
+          }
         }
       } else {
         if (x1 + 1 < gridWidth && grid[y1][x1 + 1] === null) {
           currentPuyos[1].style.left = `${left1 + cellSize}px`;
           currentPuyos[1].style.top = `${top1}px`;
           isHorizontal = true;
+          // 回転後に下にぷよや下部ラインがない場合、即座に落下
+          const newY1 = Math.round((top1 + cellSize) / cellSize);
+          if (newY1 < gridHeight && grid[newY1][x1] === null && grid[newY1][x1 + 1] === null) {
+            movePuyoPair();
+          }
         }
       }
     }
@@ -294,7 +304,7 @@
         fixedPuyos = fixedPuyos.filter(p => !matches.some(m => Math.round(parseInt(p.style.left || '0') / cellSize) === m.x && Math.round(parseInt(p.style.top || '0') / cellSize) === m.y));
         score += matches.length * 10;
         scoreDisplay.textContent = `スコア: ${score}`;
-        if (score >= 300) gameOver('おめでしょーん🐑🌟ゲームクリア！');
+        if (score >= 1000) gameOver('おめでしょーん🐑🌟ゲームクリア！');
         dropPuyos();
       }
     }
