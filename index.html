@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ぷ羊ぷ羊ゲーム</title>
+  <title>ぷよぷよゲーム</title>
   <style>
     body {
       display: flex;
@@ -31,6 +31,7 @@
       background-size: cover;
       border-radius: 50%;
       transition: all 0.1s ease;
+      z-index: 1; /* ぷよはメッセージより下 */
     }
     .puyo-red {
       background-image: url('https://pbs.twimg.com/profile_images/1890585622500503552/rOXm_mUw_400x400.jpg');
@@ -86,6 +87,16 @@
       color: #ffeb3b;
       text-shadow: 2px 2px 4px #000;
       display: none;
+      z-index: 10; /* メッセージを最前面に */
+      text-align: center;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      color: #000;
+      z-index: 5; /* スコアはぷよの上、メッセージの下 */
     }
     .hidden {
       display: none;
@@ -94,6 +105,7 @@
 </head>
 <body>
   <div id="game-container">
+    <div id="score">スコア: 0</div>
     <div id="message"></div>
   </div>
   <div id="controls">
@@ -105,6 +117,7 @@
   <script>
     const container = document.getElementById('game-container');
     const message = document.getElementById('message');
+    const scoreDisplay = document.getElementById('score');
     const startBtn = document.getElementById('start');
     const restartBtn = document.getElementById('restart');
     const swapBtn = document.getElementById('swap');
@@ -183,9 +196,12 @@
       let y1 = Math.round(top1 / cellSize);
       let y2 = Math.round(top2 / cellSize);
 
-      if (y1 < 0 || y2 < 0) {
-        gameOver('ゲームオーバー！');
-        return;
+      // 画面上枠（y=0）に到達し、すでにぷよがある場合ゲームオーバー
+      if (y1 <= 0 || y2 <= 0) {
+        if (y1 === 0 && grid[0][x1] !== null || y2 === 0 && grid[0][x1] !== null || (isHorizontal && grid[0][x2] !== null)) {
+          gameOver('しょーん 　もな！');
+          return;
+        }
       }
 
       if (isHorizontal) {
@@ -277,7 +293,8 @@
         });
         fixedPuyos = fixedPuyos.filter(p => !matches.some(m => Math.round(parseInt(p.style.left || '0') / cellSize) === m.x && Math.round(parseInt(p.style.top || '0') / cellSize) === m.y));
         score += matches.length * 10;
-        if (score >= 1000) gameOver('おめでとう！ゲームクリア！');
+        scoreDisplay.textContent = `スコア: ${score}`;
+        if (score >= 300) gameOver('おめでしょーん🐑🌟ゲームクリア！');
         dropPuyos();
       }
     }
@@ -312,6 +329,7 @@
       if (!isPlaying) {
         isPlaying = true;
         score = 0;
+        scoreDisplay.textContent = `スコア: ${score}`;
         puyos = [];
         fixedPuyos = [];
         grid = Array(gridHeight).fill().map(() => Array(gridWidth).fill(null));
